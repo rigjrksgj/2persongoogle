@@ -1,23 +1,27 @@
 const express = require("express");
-const http = require("http");
-const { WebSocketServer } = require("ws");
-
+const fetch = require("node-fetch"); // needed to fetch Google
+const path = require("path");
 const app = express();
-app.use(express.static("public"));
 
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+app.use(express.static(path.join(__dirname, "public"))); // serve /public
 
-wss.on("connection", (ws) => {
-  ws.on("message", (msg) => {
-    // Simply broadcast every event to everyone else
-    wss.clients.forEach(client => {
-      if (client !== ws && client.readyState === client.OPEN) {
-        client.send(msg);
-      }
-    });
-  });
+// Proxy Google route
+app.get("/google", async (req, res) => {
+  try {
+    const response = await fetch("https://www.google.com");
+    let html = await response.text();
+
+    // Fix relative links
+    html = html.replace(/href="\//g, 'href="https://www.google.com/');
+    html = html.replace(/src="\//g, 'src="https://www.google.com/');
+
+    res.send(html);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to load Google");
+  }
 });
 
+// Start server
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ Shared Google server on ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -1,40 +1,31 @@
-const socket = new WebSocket(
-  location.origin.replace(/^http/, "ws")
-);
+const ws = new WebSocket(`ws://${location.host}`);
+const input = document.getElementById("searchInput");
+const resultsList = document.getElementById("results");
 
-const iframe = document.getElementById("sharedFrame");
-const iframeWindow = iframe.contentWindow;
-
-// Capture inputs
-document.addEventListener("keydown", (e) => {
-  socket.send(JSON.stringify({ type: "keydown", key: e.key }));
-});
-document.addEventListener("keyup", (e) => {
-  socket.send(JSON.stringify({ type: "keyup", key: e.key }));
-});
-document.addEventListener("scroll", () => {
-  socket.send(JSON.stringify({ type: "scroll", scrollY: window.scrollY }));
-});
-document.addEventListener("click", (e) => {
-  socket.send(JSON.stringify({ type: "click", x: e.clientX, y: e.clientY }));
+// Send input to server
+input.addEventListener("input", () => {
+  ws.send(JSON.stringify({ type: "input", query: input.value }));
 });
 
-// Replay remote events
-socket.onmessage = (msg) => {
+// Receive updates from server
+ws.onmessage = (msg) => {
   const data = JSON.parse(msg.data);
-  switch (data.type) {
-    case "keydown":
-      iframeWindow.document.dispatchEvent(new KeyboardEvent("keydown", { key: data.key }));
-      break;
-    case "keyup":
-      iframeWindow.document.dispatchEvent(new KeyboardEvent("keyup", { key: data.key }));
-      break;
-    case "scroll":
-      window.scrollTo(0, data.scrollY);
-      break;
-    case "click":
-      const evt = new MouseEvent("click", { clientX: data.x, clientY: data.y });
-      iframeWindow.document.dispatchEvent(evt);
-      break;
+
+  if (data.type === "update") {
+    input.value = data.query;
+
+    resultsList.innerHTML = "";
+    data.results.forEach(r => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = r.url;
+      a.target = "_blank";
+      a.textContent = r.text;
+      li.appendChild(a);
+      resultsList.appendChild(li);
+    });
   }
 };
+
+ws.onopen = () => console.log("Connected to server!");
+ws.onerror = (err) => console.error("WebSocket error:", err);
