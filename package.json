@@ -1,26 +1,14 @@
 {
-  "name": "2persongoogle",
+  "name": "two-player-search",
   "version": "1.0.0",
-  "description": "google but 2 people???",
   "main": "server.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rigjrksgj/2persongoogle.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/rigjrksgj/2persongoogle/issues"
-  },
-  "homepage": "https://github.com/rigjrksgj/2persongoogle#readme",
   "dependencies": {
-    "express": "^5.1.0",
-    "node-fetch": "^3.3.2",
-    "ws": "^8.18.3"
+    "express": "^4.18.2",
+    "ws": "^8.13.0",
+    "node-fetch": "^3.4.1"
   }
 }
