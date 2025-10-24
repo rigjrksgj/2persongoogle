@@ -171,6 +171,54 @@ let selectedCharacters = { p1: null, p2: null };
 let currentPlayer = 1;
 let animationId = null; // store requestAnimationFrame id
 let selectedLocalCharacter = null; // the character this client clicked
+// animation system
+const animations = {}; // playerId -> { name, time, duration }
+let cameraShake = 0;
+function startAnim(player, name, durationMs) {
+    if (!player || !player.id) return;
+    animations[player.id] = { name, time: 0, duration: Math.max(50, durationMs || 300) };
+    player.animTimer = 0;
+    player.animState = name;
+    // small camera feedback for big attacks
+    if (name === 'sword_slash' || name === 'fireball_cast') cameraShake = Math.max(cameraShake, 6);
+}
+
+function updateAnimations(dtMs) {
+    const toRemove = [];
+    for (const pidStr of Object.keys(animations)) {
+        const pid = Number(pidStr);
+        const a = animations[pid];
+        a.time += dtMs;
+        const progress = Math.min(1, a.time / a.duration);
+        const player = game.players[pid];
+        if (player) player.animProgress = progress;
+
+        // at specific animation progress spawn FX / shake
+        if (a.name === 'katana_slash' && progress > 0.25 && !a._katanaHit) {
+            // spawn a strong slash particle
+            game.effects.push({ type: 'katanaSlash', x: player.x + (player.direction===1?player.width+18: -18)+player.direction*6, y: player.y + player.height/2, velocityX: player.direction*2, velocityY: 0, size: 18, color: 'rgba(255,255,255,0.98)', life: 18, damage: 0 });
+            a._katanaHit = true; cameraShake = Math.max(cameraShake, 8);
+        }
+        if (a.name === 'sword_slash' && progress > 0.35 && !a._swordHit) {
+            game.effects.push({ type:'swordArc', x: player.x + (player.direction===1?player.width+12: player.x-12), y: player.y + player.height/2, velocityX:0, velocityY:0, size:1, color:'rgba(255,240,200,0.9)', life:20 });
+            a._swordHit = true; cameraShake = Math.max(cameraShake, 10);
+        }
+        if (a.name === 'fireball_cast' && progress > 0.5 && !a._fireSent) {
+            // spawn a larger cosmetic fireball for visual punch
+            game.effects.push({ type: 'fireball', x: player.x + (player.direction===1?player.width: -20), y: player.y + player.height/2, velocityX: player.direction*12, velocityY:0, size: 18, color: '#ff3300', life: 100, damage: 0, trail: true });
+            a._fireSent = true; cameraShake = Math.max(cameraShake, 12);
+        }
+
+        if (a.time >= a.duration) toRemove.push(pid);
+    }
+    for (const pid of toRemove) {
+        const a = animations[pid];
+        delete animations[pid];
+        const p = game.players[pid]; if (p) { p.animProgress = 0; p.animState = 'idle'; }
+    }
+    // decay cameraShake
+    cameraShake = Math.max(0, cameraShake - (dtMs * 0.01));
+}
 
 // Character selection event listeners
 document.querySelectorAll('.character-option').forEach(option => {
@@ -558,6 +606,13 @@ function updateEffects() {
 }
 
 function draw() {
+    // camera shake and transform
+    ctx.save();
+    if (cameraShake && cameraShake > 0.01) {
+        const sx = (Math.random() * 2 - 1) * cameraShake;
+        const sy = (Math.random() * 2 - 1) * cameraShake;
+        ctx.translate(sx, sy);
+    }
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -643,10 +698,17 @@ function draw() {
     const p2 = game.players[2];
     player1Special.style.width = `${Math.min(100, Math.floor(p1.specialMeter || 0))}%`;
     player2Special.style.width = `${Math.min(100, Math.floor(p2.specialMeter || 0))}%`;
+    ctx.restore();
 }
 
 function gameLoop() {
     // Render loop only — authoritative state comes from server
+    const now = performance.now();
+    const dtMs = Math.max(0, now - (window._lastFrameTime || now));
+    window._lastFrameTime = now;
+    // Update client-side animations and cosmetic effects
+    try { updateAnimations(dtMs); } catch (e) { console.error('updateAnimations error', e); }
+    try { updateEffects(); } catch (e) { console.error('updateEffects error', e); }
     draw();
     animationId = requestAnimationFrame(gameLoop);
 }
@@ -692,25 +754,30 @@ function drawCharacter(player, index, t) {
             const sx = player.direction === 1 ? player.x + player.width + 6 : player.x - 6;
             const sy = player.y + player.height/2;
             game.effects.push({ type:'swordArc', x: sx, y: sy, velocityX:0, velocityY:0, size: 1, color:'rgba(220,220,255,0.9)', life: 18, ownerId: player.id });
+            startAnim(player, 'sword_slash', 400);
         }
         if (player.action === 'attack_katana') {
             // quick katana trail
             const sx = player.direction === 1 ? player.x + player.width + 8 : player.x - 8;
             const sy = player.y + player.height/2;
             game.effects.push({ type:'katanaTrail', x: sx, y: sy, velocityX: player.direction*2, velocityY: 0, size: 10, color:'rgba(255,255,255,0.95)', life: 14, ownerId: player.id });
+            startAnim(player, 'katana_slash', 260);
         }
         if (player.action === 'attack_fireball') {
             // cosmetic small fireball
             const sx = player.direction === 1 ? player.x + player.width + 6 : player.x - 6;
             game.effects.push({ type:'fireball', x: sx, y: player.y + player.height/2, velocityX: player.direction*10, velocityY:0, size:10, color:'#ff8800', life: 80, ownerId: player.id, trail:true });
+            startAnim(player, 'fireball_cast', 420);
         }
         if (player.action === 'dash') {
             // speed lines
             for (let i=0;i<3;i++) game.effects.push({ type:'dashLine', x: player.x + (player.direction===1? -10: player.width+10), y: player.y + 10 + i*6, velocityX: player.direction*6, velocityY:0, size:8, color:'rgba(255,255,255,0.6)', life: 12 });
+            startAnim(player, 'dash', 300);
         }
         if (player.action === 'special') {
             // generic special: spawn a field as cosmetic
             game.effects.push({ type:'specialField', x: player.x + player.width/2, y: player.y + player.height/2, size: 80, color: 'rgba(100,200,255,0.35)', life: 30, ownerId: player.id });
+            startAnim(player, 'special', 600);
         }
     }
     player.prevAction = player.action;
