@@ -1,0 +1,21 @@
+{
+  "name": "2persongoogle",
+  "version": "1.0.0",
+  "description": "google but 2 people???",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rigjrksgj/2persongoogle.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rigjrksgj/2persongoogle/issues"
+  },
+  "homepage": "https://github.com/rigjrksgj/2persongoogle#readme"
+}
